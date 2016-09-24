@@ -1,5 +1,5 @@
 
-$mythread.a : mythread.c
+mythread.a : mythread.c
 	gcc -c mythread.c -o mythread.o
 	ar rcs mythread.a mythread.o
 
