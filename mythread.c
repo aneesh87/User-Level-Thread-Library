@@ -6,7 +6,7 @@
 
 #define STACK_SIZE 16384
 
-#define error(x,y) fprintf(stderr, x, y)
+#define error(x,y) printf(x, y)
 
 typedef struct node {
    void *ctx; 
@@ -82,8 +82,7 @@ int MyThreadJoin(MyThread thread) {
 }
 
 
-void MyThreadJoinAll(void)
-{
+void MyThreadJoinAll(void) {
 
 
 }
