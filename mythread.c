@@ -45,21 +45,19 @@ void insert(Queue * QQ, void * ele) {
 
 void * dequeue(Queue *QQ) {
 	
-	if (QQ->count == 0) {
-		return NULL;
-	}
+    if (QQ->count == 0) {
+	    return NULL;
+    }
     
     void * ctx = QQ->front->ctx;
 	
-	if (QQ->count == 1) {
-
-		free(QQ->front);
+    if (QQ->count == 1) {
+        free(QQ->front);
         QQ->rear = NULL;
         QQ->front = NULL;
-	
-	} else {
 
-		Node * temp = QQ->front;
+    } else {
+        Node * temp = QQ->front;
         QQ->front = QQ->front->next;
         free(temp);
     }
