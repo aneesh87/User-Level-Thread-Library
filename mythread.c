@@ -1,4 +1,3 @@
-
 #include "mythread.h"
 #include <ucontext.h>
 #include <stdlib.h>
@@ -27,6 +26,11 @@ typedef struct _MyThread {
 	int block_on_all;
 	struct _MyThread *parent;
 } Thread;
+
+typedef struct _Semaphore {
+  int value;
+  Queue semq;
+} Semaphore;
 
 // Prototype
 void * dequeue(Queue *);
@@ -81,19 +85,19 @@ int has_element(Queue *QQ, void * ele) {
 void insert(Queue * QQ, void * ele) {
     
     Node * temp = calloc(1,sizeof(Node));
-    
     if (temp == NULL) {
-    	error("Out of memory");
-    	return;
+    	  error("Out of memory");
+    	  return;
     }
 
     QQ->count++;
     temp->obj = ele;
 
     if (QQ->front == NULL) {
-    	QQ->front = temp;
-    	QQ->rear = temp;
-    	return;
+    	  
+        QQ->front = temp;
+    	  QQ->rear = temp;
+    	  return;
     }
     QQ->rear->next = temp;
     QQ->rear = temp;
@@ -117,16 +121,15 @@ void * dequeue(Queue *QQ) {
         QQ->front = QQ->front->next;
         free(temp);
     }
-
     QQ->count--;
     return obj;
 }
 
-
 MyThread MyThreadCreate(void(*start_funct)(void *), void *args) {
-   if (start_funct == NULL) { error("Invalid Params"); return;}
+   if (start_funct == NULL) { error("Invalid Params"); return NULL;}
    //printf("%d\n", *(int *) args);
    Thread * child = calloc(1, sizeof(Thread));
+   if (child == NULL) { error("Out of memory"); return NULL;}
    ucontext_t *T = &child->ctx;  
    getcontext(T);
    T->uc_link = 0;
@@ -234,24 +237,51 @@ void MyThreadExit(void) {
    	   Thread * T = (Thread *)dequeue(&ready_queue);
    	   running = T;
    	   setcontext(&running->ctx);
-    }
-    
+    }    
 }
 
 MySemaphore MySemaphoreInit(int initialValue) {
-
+    if (initialValue < 0) { return NULL;}
+    Semaphore * sem = calloc(1, sizeof(Semaphore));
+    if (sem == NULL) { error("Out of memory"); return NULL;}
+    sem->value = initialValue;
+    return (MySemaphore) sem;
 }
 
 void MySemaphoreSignal(MySemaphore sem) {
-
+    if (sem == NULL) { return; }
+    Semaphore * s = (Semaphore *)sem;
+    s->value++;
+    if (s->semq.count <= 0) {
+        Thread * t = (Thread *)dequeue(&s->semq);
+        insert(&ready_queue, t);
+    }
 }
 
 void MySemaphoreWait(MySemaphore sem) {
+    if (sem == NULL) { return;}
+    Semaphore * s = (Semaphore *)sem;
+    s->value--;
 
+    if (s->value < 0) {
+        insert(&s->semq, running);
+        if (ready_queue.count == 0) {
+            setcontext(&Main);
+        } else {
+            Thread * T = (Thread *)dequeue(&ready_queue);
+            Thread * tmp = running;
+            running = T;
+            swapcontext(&tmp->ctx, &running->ctx);
+        }
+    }
 }
 
 int MySemaphoreDestroy(MySemaphore sem) {
-   return 0;
+    if (sem == NULL) { return -1;}
+    Semaphore * s = (Semaphore *)sem;
+    if (s->semq.count > 0) { return -1;}
+    free(s);
+    return 0;
 }
 
 void MyThreadInit(void(*start_funct)(void *), void *args) {
