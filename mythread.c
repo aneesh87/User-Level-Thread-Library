@@ -18,7 +18,6 @@ typedef struct queue {
     int count;
 } Queue;
 
-
 typedef struct _MyThread {
 	Queue childq;
 	ucontext_t ctx;
@@ -203,11 +202,8 @@ void MyThreadJoinAll(void) {
    	   Thread * T = (Thread *)dequeue(&ready_queue);
    	   Thread * tmp = running;
    	   running = T;
-       //printf("%x %x\n\n", &tmp->ctx, &running->ctx);
    	   swapcontext(&tmp->ctx, &running->ctx);
-       //setcontext(&tmp->ctx);
-   }
-   
+   } 
 }
 
 void MyThreadExit(void) {
