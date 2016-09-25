@@ -33,6 +33,7 @@ typedef struct _Semaphore {
 
 // Prototype
 void * dequeue(Queue *);
+void context_switch ();
 
 // Globals
 
@@ -148,15 +149,9 @@ MyThread MyThreadCreate(void(*start_funct)(void *), void *args) {
 void MyThreadYield(void) {
    // If ready queue is empty no change
    if (ready_queue.count == 0) {return;}
-
    // Insert running into ready_queue (size => 1 no issues)
    insert(&ready_queue,running);
-
-   // Thread at head of ready queue becomes running
-   Thread * T = (Thread *)dequeue(&ready_queue);
-   Thread * tmp = running;
-   running = T;
-   swapcontext(&tmp->ctx, &running->ctx);
+   context_switch();
 }
 
 int MyThreadJoin(MyThread thread) {
@@ -171,15 +166,7 @@ int MyThreadJoin(MyThread thread) {
    // add to blocked queue
    insert(&blocked_queue, running);
    //dequeue from ready queue and put into running queue
-   if (ready_queue.count == 0) {
-   	   setcontext(&Main);
-   } else {
-   // Thread at head of ready queue becomes the running thread
-   	   Thread * T = (Thread *)dequeue(&ready_queue);
-   	   Thread * tmp = running;
-   	   running = T;
-   	   swapcontext(&tmp->ctx, &running->ctx);
-   }
+   context_switch();
    return 0;
 }
 
@@ -195,15 +182,7 @@ void MyThreadJoinAll(void) {
    // add to blocked queue
    insert(&blocked_queue, running);
    // if count of ready queue is 0 terminate the thread system
-   if (ready_queue.count == 0) {
-   	   setcontext(&Main);
-   } else {
-   // thread at head of ready queue becomes the running thread
-   	   Thread * T = (Thread *)dequeue(&ready_queue);
-   	   Thread * tmp = running;
-   	   running = T;
-   	   swapcontext(&tmp->ctx, &running->ctx);
-   } 
+   context_switch();
 }
 
 void MyThreadExit(void) {
@@ -228,12 +207,14 @@ void MyThreadExit(void) {
         }
     }
     if (ready_queue.count == 0) {
-   	    setcontext(&Main);
+        setcontext(&Main);
     } else {
-   	   Thread * T = (Thread *)dequeue(&ready_queue);
-   	   running = T;
-   	   setcontext(&running->ctx);
-    }    
+      // Thread at head of ready queue becomes the running thread
+      // Current thread no longer runs, no needs to save context
+        Thread * T = (Thread *)dequeue(&ready_queue);
+        running = T;
+        setcontext(&running->ctx);
+    } 
 }
 
 MySemaphore MySemaphoreInit(int initialValue) {
@@ -261,14 +242,7 @@ void MySemaphoreWait(MySemaphore sem) {
 
     if (s->value < 0) {
         insert(&s->semq, running);
-        if (ready_queue.count == 0) {
-            setcontext(&Main);
-        } else {
-            Thread * T = (Thread *)dequeue(&ready_queue);
-            Thread * tmp = running;
-            running = T;
-            swapcontext(&tmp->ctx, &running->ctx);
-        }
+        context_switch();
     }
 }
 
@@ -299,43 +273,15 @@ void MyThreadInit(void(*start_funct)(void *), void *args) {
    swapcontext(&Main, T);
 }
 
-/*
-
-//Queue Test 
-
-int main(int argc, char **argv) {
-	
-	int arr[10] = {1,2,3,4,5,6,7,8,9,10};
-    insert(&ready_queue, &arr[0]);
-    insert(&ready_queue, &arr[1]);
-    insert(&ready_queue, &arr[2]);
-    insert(&ready_queue, &arr[3]);
-    
-    printf("%d\n", *(int *)dequeue(&ready_queue));
-    printf("%d\n", *(int *)dequeue(&ready_queue));
-    printf("%d\n", *(int *)dequeue(&ready_queue));
-    printf("%d\n", *(int *)dequeue(&ready_queue));
-    printf("%p\n", dequeue(&ready_queue));
-    printf("%p\n", dequeue(&ready_queue));
-    insert(&ready_queue, &arr[8]);
-    insert(&ready_queue, &arr[9]);
-    printf("%d\n", *(int *)dequeue(&ready_queue));
-    printf("%d\n", *(int *)dequeue(&ready_queue));
-    
-    remove_node(&ready_queue, &arr[2]);
-    print(&ready_queue);
-    insert(&ready_queue, &arr[4]);
-    insert(&ready_queue, &arr[5]);
-    printf("\ncount = %d\n", ready_queue.count);
-    print(&ready_queue);
-    printf("\n");
-    dequeue(&ready_queue);
-    print(&ready_queue);
-    printf("\ncount = %d\n", ready_queue.count);
-    remove_node(&ready_queue, &arr[1]);
-    print(&ready_queue);
-    printf("\ncount = %d\n", ready_queue.count);
-    return 0;
+void context_switch () {
+   
+   if (ready_queue.count == 0) {
+       setcontext(&Main);
+   } else {
+   // Thread at head of ready queue becomes the running thread
+       Thread * T = (Thread *)dequeue(&ready_queue);
+       Thread * tmp = running;
+       running = T;
+       swapcontext(&tmp->ctx, &running->ctx);
+   }
 }
-*/
-
