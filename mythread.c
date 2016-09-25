@@ -125,7 +125,7 @@ void * dequeue(Queue *QQ) {
 
 MyThread MyThreadCreate(void(*start_funct)(void *), void *args) {
    if (start_funct == NULL) { error("Invalid Params"); return;}
-   printf("%d\n", *(int *) args);
+   //printf("%d\n", *(int *) args);
    Thread * child = calloc(1, sizeof(Thread));
    ucontext_t *T = &child->ctx;  
    getcontext(T);
@@ -208,7 +208,7 @@ void MyThreadJoinAll(void) {
 }
 
 void MyThreadExit(void) {
-  /*  
+    
     Thread * parent = running->parent;
     
     if (parent != NULL) {
@@ -235,7 +235,7 @@ void MyThreadExit(void) {
    	   running = T;
    	   setcontext(&running->ctx);
     }
-    */
+    
 }
 
 MySemaphore MySemaphoreInit(int initialValue) {
@@ -256,7 +256,7 @@ int MySemaphoreDestroy(MySemaphore sem) {
 
 void MyThreadInit(void(*start_funct)(void *), void *args) {
    if (start_funct == NULL) { error("Invalid Params"); return;}
-   printf("%d\n", *(int *) args);
+   //printf("%d\n", *(int *) args);
    
    ucontext_t *T;
    root = calloc(1, sizeof(Thread));

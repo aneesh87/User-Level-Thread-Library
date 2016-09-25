@@ -1,4 +1,4 @@
-all : mythread.a fibtest mergetest
+all : clean mythread.a fibtest mergetest
 
 mythread.a : mythread.o
 	ar rcs mythread.a mythread.o
