@@ -28,10 +28,14 @@ typedef struct _MyThread {
 	struct _MyThread *parent;
 } Thread;
 
+// Prototype
 void * dequeue(Queue *);
+
+// Globals
 
 Thread * running;
 Thread * root;
+ucontext_t Main;
 
 Queue ready_queue = {NULL, NULL,0}, blocked_queue = {NULL, NULL,0};
 
@@ -62,12 +66,16 @@ void remove_node(Queue * QQ, void * ele) {
     }
 }
 
-void print(Queue *QQ) {
+int has_element(Queue *QQ, void * ele) {
 	Node * temp = QQ->front;
 	while (temp != NULL) {
-		printf("%d", *(int *)(temp->obj));
+		//printf("%d", *(int *)(temp->obj));
+		if (temp->obj == ele) {
+			return 1;
+		}
 		temp = temp->next;
 	}
+	return 0;
 }
 
 void insert(Queue * QQ, void * ele) {
@@ -117,15 +125,15 @@ void * dequeue(Queue *QQ) {
 
 MyThread MyThreadCreate(void(*start_funct)(void *), void *args) {
    if (start_funct == NULL) { error("Invalid Params"); return;}
-
+   printf("%d\n", *(int *) args);
    Thread * child = calloc(1, sizeof(Thread));
-   ucontext_t T = child->ctx;  
-   getcontext(&T);
-   T.uc_link = 0;
-   T.uc_stack.ss_sp=malloc(STACK_SIZE);
-   T.uc_stack.ss_size=STACK_SIZE;
-   T.uc_stack.ss_flags=0;
-   makecontext(&T, (void (*)(void))start_funct, 1, args);
+   ucontext_t *T = &child->ctx;  
+   getcontext(T);
+   T->uc_link = 0;
+   T->uc_stack.ss_sp= malloc(STACK_SIZE);
+   T->uc_stack.ss_size=STACK_SIZE;
+   T->uc_stack.ss_flags=0;
+   makecontext(T, (void (*)(void))start_funct, 1, args);
    
    child->parent = running;
 
@@ -136,35 +144,98 @@ MyThread MyThreadCreate(void(*start_funct)(void *), void *args) {
 }
 
 void MyThreadYield(void) {
+   // If ready queue is empty no change
+   if (ready_queue.count == 0) {return;}
 
+   // Insert running into ready_queue (size => 1 no issues)
+   insert(&ready_queue,running);
+
+   // Thread at head of ready queue becomes running
+   Thread * T = (Thread *)dequeue(&ready_queue);
+   Thread * tmp = running;
+   running = T;
+   swapcontext(&tmp->ctx, &running->ctx);
 }
 
 int MyThreadJoin(MyThread thread) {
+   // if thread is NULL or thread is not in running child Q return
+   Thread * child = (Thread *) thread;
+   if (thread == NULL || 
+   	    (has_element(&running->childq, child) == 0)) {
+       return -1;
+   }   
+   // Indicate that running is blocked on a specific child
+   running->block_on_child = child;
+   // add to blocked queue
+   insert(&blocked_queue, running);
+   //dequeue from ready queue and put into running queue
+   if (ready_queue.count == 0) {
+   	   setcontext(&Main);
+   } else {
+   // Thread at head of ready queue becomes the running thread
+   	   Thread * T = (Thread *)dequeue(&ready_queue);
+   	   Thread * tmp = running;
+   	   running = T;
+   	   swapcontext(&tmp->ctx, &running->ctx);
+   }
    return 0;
 }
 
 
 void MyThreadJoinAll(void) {
 
-
+   // If child Queue is empty just return
+   if (running->childq.count == 0) {
+   	   return;
+   }
+   // Indicate that this thread is blocked on all child
+   running->block_on_all = 1;
+   // add to blocked queue
+   insert(&blocked_queue, running);
+   // if count of ready queue is 0 terminate the thread system
+   if (ready_queue.count == 0) {
+   	   setcontext(&Main);
+   } else {
+   // thread at head of ready queue becomes the running thread
+   	   Thread * T = (Thread *)dequeue(&ready_queue);
+   	   Thread * tmp = running;
+   	   running = T;
+       //printf("%x %x\n\n", &tmp->ctx, &running->ctx);
+   	   swapcontext(&tmp->ctx, &running->ctx);
+       //setcontext(&tmp->ctx);
+   }
+   
 }
 
 void MyThreadExit(void) {
+  /*  
+    Thread * parent = running->parent;
     
-    // dequeue it from its parent childq
+    if (parent != NULL) {
+        remove_node(&parent->childq, running);
+        if (has_element(&blocked_queue, parent)) {
 
-    // if the parent has called Join all and queue is empty
-    // dequeue it from blocked and put it in ready
+            if (parent->block_on_child == running) {
+        	    remove_node(&blocked_queue, parent);
+        	    insert(&ready_queue, parent);
+        	    parent->block_on_child = NULL;
 
-    // and if thread's parent has called join on it 
-    // then also put it in ready queue 
-
-	// dequeue first thread from ready queue 
-
-	// put it as running
-
-	// setcontext
-
+            } else if (parent->block_on_all && 
+            	        (parent->childq.count == 0)) {
+                remove_node(&blocked_queue, parent);
+                insert(&ready_queue, parent);
+                parent->block_on_all = 0;
+            }
+        }
+    }
+    if (ready_queue.count == 0) {
+   	    setcontext(&Main);
+    } else {
+   	   Thread * T = (Thread *)dequeue(&ready_queue);
+   	   running = T;
+   	   setcontext(&running->ctx);
+    }
+    */
 }
 
 MySemaphore MySemaphoreInit(int initialValue) {
@@ -185,20 +256,21 @@ int MySemaphoreDestroy(MySemaphore sem) {
 
 void MyThreadInit(void(*start_funct)(void *), void *args) {
    if (start_funct == NULL) { error("Invalid Params"); return;}
+   printf("%d\n", *(int *) args);
    
-   ucontext_t Main, T;
+   ucontext_t *T;
    root = calloc(1, sizeof(Thread));
-   T = root->ctx;
+   T = &root->ctx;
    getcontext(&Main);  
-   getcontext(&T);
-   T.uc_link = 0;
-   T.uc_stack.ss_sp=malloc(STACK_SIZE);
-   T.uc_stack.ss_size=STACK_SIZE;
-   T.uc_stack.ss_flags=0;
+   getcontext(T);
+   T->uc_link = 0;
+   T->uc_stack.ss_sp=malloc(STACK_SIZE);
+   T->uc_stack.ss_size=STACK_SIZE;
+   T->uc_stack.ss_flags=0;
    
    running = root;
-   makecontext(&T, (void (*)(void))start_funct, 1, args);
-   swapcontext(&Main, &T);
+   makecontext(T, (void (*)(void))start_funct, 1, args);
+   swapcontext(&Main, T);
 }
 
 /*

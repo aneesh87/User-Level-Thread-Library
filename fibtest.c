@@ -28,7 +28,7 @@
 //
 void fib(void *in)
 {
-  printf("Hi guys\n");
+  //printf("Hi guys %p\n", in);
   int *n = (int *)in;	 	/* cast input parameter to an int * */
 
   if (*n == 0)
