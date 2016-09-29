@@ -58,5 +58,9 @@ int MySemaphoreDestroy(MySemaphore sem);
 // Create and run the "main" thread
 void MyThreadInit(void(*start_funct)(void *), void *args);
 
+// ****** CALLS ONLY FOR UNIX PROCESS ****** 
+// Convert unix process into "main" thread of thread subsystem
+void MyThreadInitExtra();
+
 #endif /* MYTHREAD_H */
 /*........................ end of mythread.h ................................*/

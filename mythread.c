@@ -40,6 +40,7 @@ void context_switch ();
 Thread * running;
 Thread * root;
 ucontext_t Main;
+ucontext_t exit_ctx;
 
 Queue ready_queue = {NULL, NULL,0}, blocked_queue = {NULL, NULL,0};
 
@@ -132,7 +133,7 @@ MyThread MyThreadCreate(void(*start_funct)(void *), void *args) {
    if (child == NULL) { error("Out of memory"); return NULL;}
    ucontext_t *T = &child->ctx;  
    getcontext(T);
-   T->uc_link = 0;
+   T->uc_link = &exit_ctx;
    T->uc_stack.ss_sp= malloc(STACK_SIZE);
    T->uc_stack.ss_size=STACK_SIZE;
    T->uc_stack.ss_flags=0;
@@ -229,7 +230,7 @@ void MySemaphoreSignal(MySemaphore sem) {
     if (sem == NULL) { return; }
     Semaphore * s = (Semaphore *)sem;
     s->value++;
-    if (s->semq.count <= 0) {
+    if (s->value <= 0) {
         Thread * t = (Thread *)dequeue(&s->semq);
         insert(&ready_queue, t);
     }
@@ -254,16 +255,28 @@ int MySemaphoreDestroy(MySemaphore sem) {
     return 0;
 }
 
+void init_exit_context() {
+
+  getcontext(&exit_ctx);
+  exit_ctx.uc_link = 0;
+  exit_ctx.uc_stack.ss_sp = malloc(STACK_SIZE);
+  exit_ctx.uc_stack.ss_size = STACK_SIZE;
+  exit_ctx.uc_stack.ss_flags = 0;
+  makecontext(&exit_ctx, MyThreadExit, 0);
+  return;
+}
+
 void MyThreadInit(void(*start_funct)(void *), void *args) {
    if (start_funct == NULL) { error("Invalid Params"); return;}
    //printf("%d\n", *(int *) args);
    
+   init_exit_context();
    ucontext_t *T;
    root = calloc(1, sizeof(Thread));
    T = &root->ctx;
    getcontext(&Main);  
    getcontext(T);
-   T->uc_link = 0;
+   T->uc_link = &exit_ctx;
    T->uc_stack.ss_sp=malloc(STACK_SIZE);
    T->uc_stack.ss_size=STACK_SIZE;
    T->uc_stack.ss_flags=0;
@@ -271,6 +284,36 @@ void MyThreadInit(void(*start_funct)(void *), void *args) {
    running = root;
    makecontext(T, (void (*)(void))start_funct, 1, args);
    swapcontext(&Main, T);
+}
+
+void ProcessExit() {
+  exit(0);
+}
+
+void MyThreadInitExtra() {
+   
+   init_exit_context();
+   ucontext_t *T;
+   root = calloc(1, sizeof(Thread));
+   T = &root->ctx;
+
+
+   getcontext(&Main);
+   Main.uc_link = 0;
+   Main.uc_stack.ss_sp = malloc(STACK_SIZE);
+   Main.uc_stack.ss_size = STACK_SIZE;
+   Main.uc_stack.ss_flags = 0;
+   makecontext(&Main, ProcessExit, 0);
+
+
+   getcontext(T);
+   T->uc_link = &exit_ctx;
+   T->uc_stack.ss_sp=malloc(STACK_SIZE);
+   T->uc_stack.ss_size=STACK_SIZE;
+   T->uc_stack.ss_flags=0;
+   
+   running = root;
+   swapcontext(&root->ctx, &root->ctx);
 }
 
 void context_switch () {
