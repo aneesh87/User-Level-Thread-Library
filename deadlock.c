@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "mythreadextra.h"
+#include "mythread.h"
 
 int resource = 1;
 MySemaphore * s;
